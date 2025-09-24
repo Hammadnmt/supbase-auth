@@ -42,7 +42,6 @@ export default function Map() {
       setLoading(false);
     });
   }, [user]);
-  console.log("others:", otherLocation);
 
   // Listen for other users' locations
   useEffect(() => {
