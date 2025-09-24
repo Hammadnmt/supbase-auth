@@ -7,6 +7,7 @@ import Dashboard from "./Dasboard";
 import { AuthProvider } from "./context/useAuth";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "./context/theme-provider";
+import Map from "./pages/Map";
 
 function App() {
   return (
@@ -20,6 +21,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/map"
+              element={
+                <ProtectedRoute>
+                  <Map />
                 </ProtectedRoute>
               }
             />

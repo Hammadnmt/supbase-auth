@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "./libs/supabase";
+import { locationChannel, supabase } from "./libs/supabase";
 import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -30,8 +30,15 @@ export default function AuthPage() {
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithPassword(loginData);
-      if (error) toast.error(error.message);
-      else toast.success("Logged in successfully");
+      if (error) {
+        toast.error(error.message);
+        return;
+      } else toast.success("Logged in successfully");
+      locationChannel.subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          console.log("subscribed to location channel");
+        }
+      });
     } catch {
       toast.error("Unexpected error");
     } finally {
@@ -42,13 +49,21 @@ export default function AuthPage() {
   const handleSignup = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: signupData.email,
         password: signupData.password,
-        options: { data: { fullname: signupData.fullname, phone: signupData.phone } },
       });
-      if (error) toast.error(error.message);
-      else toast.success("Signed up successfully");
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      const { status } = await supabase.from("profiles").insert({
+        id: data.user?.id,
+        phone: signupData.phone,
+        full_name: signupData.fullname,
+      });
+      if (status !== 201) toast.error("Error creating profile");
+      else toast.success(`Signed up successfully ${data.user?.email}`);
     } catch {
       toast.error("Unexpected error");
     } finally {
