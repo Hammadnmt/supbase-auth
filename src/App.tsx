@@ -5,23 +5,28 @@ import { ProtectedRoute } from "./ProtectedRoutes";
 import LoginPage from "./LoginPage";
 import Dashboard from "./Dasboard";
 import { AuthProvider } from "./context/useAuth";
+import { Toaster } from "sonner";
+import { ThemeProvider } from "./context/theme-provider";
 
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </BrowserRouter>
+      <ThemeProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </BrowserRouter>
+        <Toaster />
+      </ThemeProvider>
     </AuthProvider>
   );
 }
