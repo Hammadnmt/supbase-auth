@@ -2,18 +2,21 @@ import { watchLocation } from "@/libs/getCuurentlocation";
 import { locationChannel } from "@/libs/supabase";
 import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useAuth } from "@/context/useAuth";
 import getCenter from "@/libs/getMapCenter";
-// Simple loader component
-function Loader() {
-  return (
-    <div className="flex items-center justify-center h-screen">
-      <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-    </div>
-  );
-}
+import pinIcon from "@/assets/pin-icon.jpg";
+import Loader from "@/components/Loader";
 
+// Simple loader component
+
+const customIcon = L.icon({
+  iconUrl: pinIcon,
+  iconSize: [32, 32], // width, height
+  iconAnchor: [16, 32], // point of the icon which will correspond to marker's location
+  popupAnchor: [0, -32], // where popups open relative to the iconAnchor
+});
 export interface UserLocation {
   userId: string | undefined;
   lat: number;
@@ -39,6 +42,7 @@ export default function Map() {
       setLoading(false);
     });
   }, [user]);
+  console.log("others:", otherLocation);
 
   // Listen for other users' locations
   useEffect(() => {
@@ -64,7 +68,7 @@ export default function Map() {
     <MapContainer center={center} zoom={5} style={{ height: "100vh", width: "100%" }}>
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       {myLocation && (
-        <Marker position={[myLocation.lat, myLocation.lng]}>
+        <Marker icon={customIcon} position={[myLocation.lat, myLocation.lng]}>
           <Popup>You</Popup>
         </Marker>
       )}
