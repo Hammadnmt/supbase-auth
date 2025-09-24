@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { locationChannel, supabase } from "./libs/supabase";
+import { supabase } from "./libs/supabase";
 import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -9,12 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useTheme } from "@/context/theme-provider";
+import { useNavigate } from "react-router";
 
 export default function AuthPage() {
   const { theme } = useTheme();
-
   const [loading, setLoading] = useState(false);
-
   // login state
   const [loginData, setLoginData] = useState({ email: "", password: "" });
 
@@ -25,6 +24,7 @@ export default function AuthPage() {
     password: "",
     phone: "",
   });
+  const router = useNavigate();
 
   const handleLogin = async () => {
     setLoading(true);
@@ -33,12 +33,14 @@ export default function AuthPage() {
       if (error) {
         toast.error(error.message);
         return;
-      } else toast.success("Logged in successfully");
-      locationChannel.subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          console.log("subscribed to location channel");
+      } else {
+        const channel = supabase.channel("location-update").subscribe();
+        console.log("Subscribed to channel", channel);
+        if (channel.state === "joined") {
+          toast.success("Subscribed to location channel");
         }
-      });
+        router("/map");
+      }
     } catch {
       toast.error("Unexpected error");
     } finally {

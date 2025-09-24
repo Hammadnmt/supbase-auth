@@ -9,14 +9,13 @@ import getCenter from "@/libs/getMapCenter";
 import pinIcon from "@/assets/pin-icon.jpg";
 import Loader from "@/components/Loader";
 
-// Simple loader component
-
 const customIcon = L.icon({
   iconUrl: pinIcon,
-  iconSize: [32, 32], // width, height
-  iconAnchor: [16, 32], // point of the icon which will correspond to marker's location
-  popupAnchor: [0, -32], // where popups open relative to the iconAnchor
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
+  popupAnchor: [0, -32],
 });
+
 export interface UserLocation {
   userId: string | undefined;
   lat: number;
@@ -25,55 +24,65 @@ export interface UserLocation {
 
 export default function Map() {
   const [myLocation, setMyLocation] = useState<UserLocation | null>(null);
-  const [otherLocation, setOtherLocation] = useState<UserLocation[]>([]);
+  const [otherLocations, setOtherLocations] = useState<Record<string, UserLocation>>({});
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
-  // Watch my location
+  // 🔹 Watch and broadcast my location
   useEffect(() => {
     watchLocation((pos) => {
       const updatedLocation = { userId: user?.id, lat: pos.lat, lng: pos.lng };
       setMyLocation(updatedLocation);
 
       // Broadcast updated location
-      locationChannel.send({ type: "broadcast", event: "location-update", payload: updatedLocation });
+      locationChannel.send({
+        type: "broadcast",
+        event: "location-update",
+        payload: updatedLocation,
+      });
 
-      // Stop loading when we get first location
       setLoading(false);
     });
   }, [user]);
 
-  // Listen for other users' locations
+  console.log("other", otherLocations);
+
+  // 🔹 Listen for other users' locations
   useEffect(() => {
     locationChannel
-      .on("system", { event: "location-update" }, (payload: UserLocation) => {
-        setOtherLocation((prev) => {
-          const exists = prev.find((loc) => loc.userId === payload.userId);
-          if (exists) {
-            return prev.map((loc) => (loc.userId === payload.userId ? payload : loc));
-          } else {
-            return [...prev, payload];
-          }
-        });
+      .on("system", { event: "location-update" }, (payload: { userId: string; lat: number; lng: number }) => {
+        console.log("received location", payload);
+        if (!payload.userId || payload.userId === user?.id) return; // ignore my own updates
+
+        setOtherLocations((prev) => ({
+          ...prev,
+          [payload.userId]: payload, // upsert by userId
+        }));
       })
       .subscribe();
-  }, []);
+
+    return () => {
+      locationChannel.unsubscribe();
+    };
+  }, [user]);
 
   if (loading || !myLocation) return <Loader />;
 
-  const center = getCenter(myLocation, otherLocation) as [number, number];
+  const center = getCenter(myLocation, Object.values(otherLocations)) as [number, number];
 
   return (
     <MapContainer center={center} zoom={5} style={{ height: "100vh", width: "100%" }}>
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-      {myLocation && (
-        <Marker icon={customIcon} position={[myLocation.lat, myLocation.lng]}>
-          <Popup>You</Popup>
-        </Marker>
-      )}
-      {otherLocation.map((user) => (
+
+      {/* My location */}
+      <Marker icon={customIcon} position={[myLocation.lat, myLocation.lng]}>
+        <Popup>You</Popup>
+      </Marker>
+
+      {/* Other users */}
+      {Object.values(otherLocations).map((user) => (
         <Marker key={user.userId} position={[user.lat, user.lng]}>
-          <Popup>Other User</Popup>
+          <Popup>{user.userId}</Popup>
         </Marker>
       ))}
     </MapContainer>

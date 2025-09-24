@@ -1,5 +1,5 @@
 // App.tsx
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router";
 
 import { ProtectedRoute } from "./ProtectedRoutes";
 import LoginPage from "./LoginPage";
