@@ -25,7 +25,6 @@ export default function AuthPage() {
     phone: "",
   });
   const router = useNavigate();
-
   const handleLogin = async () => {
     setLoading(true);
     try {
@@ -34,11 +33,6 @@ export default function AuthPage() {
         toast.error(error.message);
         return;
       } else {
-        const channel = supabase.channel("location-update").subscribe();
-        console.log("Subscribed to channel", channel);
-        if (channel.state === "joined") {
-          toast.success("Subscribed to location channel");
-        }
         router("/map");
       }
     } catch {

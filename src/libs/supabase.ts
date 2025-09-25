@@ -4,4 +4,4 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_KEY as string;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-export const locationChannel = supabase.channel("location").subscribe();
+export const locationChannel = supabase.channel("location-update").subscribe();

@@ -1,5 +1,4 @@
 import { watchLocation } from "@/libs/getCuurentlocation";
-import { locationChannel } from "@/libs/supabase";
 import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
@@ -8,6 +7,7 @@ import { useAuth } from "@/context/useAuth";
 import getCenter from "@/libs/getMapCenter";
 import pinIcon from "@/assets/pin-icon.jpg";
 import Loader from "@/components/Loader";
+import { useRealtime } from "@/context/real-time-provider";
 
 const customIcon = L.icon({
   iconUrl: pinIcon,
@@ -27,46 +27,61 @@ export default function Map() {
   const [otherLocations, setOtherLocations] = useState<Record<string, UserLocation>>({});
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+  const { channel } = useRealtime();
 
-  // 🔹 Watch and broadcast my location
+  // 🔹 Watch and broadcast my location (on movement)
   useEffect(() => {
     watchLocation((pos) => {
       const updatedLocation = { userId: user?.id, lat: pos.lat, lng: pos.lng };
       setMyLocation(updatedLocation);
+      setLoading(false);
 
-      // Broadcast updated location
-      locationChannel.send({
+      if (!channel || channel?.state !== "joined") return;
+
+      channel.send({
         type: "broadcast",
         event: "location-update",
         payload: updatedLocation,
       });
-
-      setLoading(false);
     });
-  }, [user]);
+  }, [user, channel]);
 
-  console.log("other", otherLocations);
+  // 🔹 Broadcast immediately when I have a location + joined channel
+  useEffect(() => {
+    if (myLocation && channel?.state === "joined") {
+      channel.send({
+        type: "broadcast",
+        event: "location-update",
+        payload: myLocation,
+      });
+    }
+  }, [channel?.state, channel, myLocation]);
 
   // 🔹 Listen for other users' locations
   useEffect(() => {
-    locationChannel
-      .on("system", { event: "location-update" }, (payload: { userId: string; lat: number; lng: number }) => {
-        console.log("received location", payload);
-        if (!payload.userId || payload.userId === user?.id) return; // ignore my own updates
+    channel
+      ?.on(
+        "broadcast" as any,
+        { event: "location-update" },
+        (payload: { userId: string; lat: number; lng: number }) => {
+          console.log("received location", payload);
+          if (!payload.userId || payload.userId === user?.id) return; // ignore my own updates
 
-        setOtherLocations((prev) => ({
-          ...prev,
-          [payload.userId]: payload, // upsert by userId
-        }));
-      })
+          setOtherLocations((prev) => ({
+            ...prev,
+            [payload.userId]: payload, // upsert by userId
+          }));
+        }
+      )
       .subscribe();
 
     return () => {
-      locationChannel.unsubscribe();
+      channel?.unsubscribe();
     };
-  }, [user]);
+  }, [user, channel]);
 
   if (loading || !myLocation) return <Loader />;
+  console.log("Rendering map with myLocation:", myLocation, "otherLocations:", otherLocations);
 
   const center = getCenter(myLocation, Object.values(otherLocations)) as [number, number];
 
