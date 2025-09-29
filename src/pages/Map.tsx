@@ -6,11 +6,20 @@ import "leaflet/dist/leaflet.css";
 import { useAuth } from "@/context/useAuth";
 import getCenter from "@/libs/getMapCenter";
 import pinIcon from "@/assets/pin-icon.jpg";
+import otherpinIcon from "@/assets/other-pin.png";
 import Loader from "@/components/Loader";
 import { useRealtime } from "@/context/real-time-provider";
+import { toast } from "sonner";
 
 const customIcon = L.icon({
   iconUrl: pinIcon,
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
+  popupAnchor: [0, -32],
+});
+
+const customOtherIcon = L.icon({
+  iconUrl: otherpinIcon,
   iconSize: [32, 32],
   iconAnchor: [16, 32],
   popupAnchor: [0, -32],
@@ -24,66 +33,70 @@ export interface UserLocation {
 
 export default function Map() {
   const [myLocation, setMyLocation] = useState<UserLocation | null>(null);
-  const [otherLocations, setOtherLocations] = useState<Record<string, UserLocation>>({});
+  const [otherLocations, setOtherLocations] = useState<UserLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const { channel } = useRealtime();
 
-  // 🔹 Watch and broadcast my location (on movement)
   useEffect(() => {
-    watchLocation((pos) => {
-      const updatedLocation = { userId: user?.id, lat: pos.lat, lng: pos.lng };
-      setMyLocation(updatedLocation);
-      setLoading(false);
+    watchLocation(
+      (pos) => {
+        const updatedLocation = { userId: user?.id, lat: pos.lat, lng: pos.lng };
+        setMyLocation(updatedLocation);
+        setLoading(false);
 
-      if (!channel || channel?.state !== "joined") return;
-
-      channel.send({
-        type: "broadcast",
-        event: "location-update",
-        payload: updatedLocation,
-      });
-    });
-  }, [user, channel]);
-
-  // 🔹 Broadcast immediately when I have a location + joined channel
-  useEffect(() => {
-    if (myLocation && channel?.state === "joined") {
-      channel.send({
-        type: "broadcast",
-        event: "location-update",
-        payload: myLocation,
-      });
-    }
-  }, [channel?.state, channel, myLocation]);
-
-  // 🔹 Listen for other users' locations
-  useEffect(() => {
-    channel
-      ?.on(
-        "broadcast" as any,
-        { event: "location-update" },
-        (payload: { userId: string; lat: number; lng: number }) => {
-          console.log("received location", payload);
-          if (!payload.userId || payload.userId === user?.id) return; // ignore my own updates
-
-          setOtherLocations((prev) => ({
-            ...prev,
-            [payload.userId]: payload, // upsert by userId
-          }));
+        if (!channel) {
+          console.warn("Channel is not available");
+          return;
         }
-      )
-      .subscribe();
+
+        channel.send({
+          type: "broadcast",
+          event: "location-update",
+          payload: updatedLocation,
+        });
+      },
+      (error) => {
+        toast.error("Error getting location: " + error.message);
+        setLoading(false);
+      }
+    );
+  }, [user?.id, channel]);
+
+  useEffect(() => {
+    if (!channel) {
+      console.warn("Channel is not available");
+      return;
+    }
+
+    const subscription = channel.on(
+      "broadcast",
+      { event: "location-update" },
+      (payload: { payload: UserLocation }) => {
+        const newLocation = payload.payload;
+
+        // Don't add our own location to other locations
+        if (newLocation.userId === user?.id) {
+          return;
+        }
+
+        setOtherLocations((prev) => {
+          const filtered = prev.filter((loc) => loc.userId !== newLocation.userId);
+          return [...filtered, newLocation];
+        });
+      }
+    );
 
     return () => {
-      channel?.unsubscribe();
+      if (subscription) {
+        channel.unsubscribe();
+      }
     };
-  }, [user, channel]);
+  }, [channel, user?.id]);
 
   if (loading || !myLocation) return <Loader />;
-  console.log("Rendering map with myLocation:", myLocation, "otherLocations:", otherLocations);
 
-  const center = getCenter(myLocation, Object.values(otherLocations)) as [number, number];
+  const center = getCenter(myLocation, otherLocations) as [number, number];
 
   return (
     <MapContainer center={center} zoom={5} style={{ height: "100vh", width: "100%" }}>
@@ -95,9 +108,9 @@ export default function Map() {
       </Marker>
 
       {/* Other users */}
-      {Object.values(otherLocations).map((user) => (
-        <Marker key={user.userId} position={[user.lat, user.lng]}>
-          <Popup>{user.userId}</Popup>
+      {otherLocations.map((userLoc) => (
+        <Marker icon={customOtherIcon} key={userLoc.userId} position={[userLoc.lat, userLoc.lng]}>
+          <Popup>{userLoc.userId}</Popup>
         </Marker>
       ))}
     </MapContainer>

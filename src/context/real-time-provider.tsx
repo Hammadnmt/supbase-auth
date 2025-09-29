@@ -12,22 +12,15 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const [channel, setChannel] = useState<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
-    // Create + subscribe once
-    const ch = supabase.channel("realtime:location-update").subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        console.log("✅ Subscribed to realtime:location-update");
-      }
-    });
-
-    setChannel(ch);
-
-    // Cleanup
-    return () => {
-      ch.unsubscribe();
-    };
-  }, []);
+    const ch = supabase.channel("location-update");
+    const subscribed = ch.subscribe();
+    setChannel(subscribed);
+  }, [channel]);
 
   return <RealtimeContext.Provider value={{ channel }}>{children}</RealtimeContext.Provider>;
 }
-
-export const useRealtime = () => useContext(RealtimeContext);
+export function useRealtime() {
+  const context = useContext(RealtimeContext);
+  if (!context) throw new Error("useRealtime must be used inside RealtimeContex");
+  return context;
+}
